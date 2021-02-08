@@ -1,0 +1,147 @@
+trigger:
+  branches:
+    include:
+    - '*'
+
+variables:
+  serviceConnection: 'terraform-basic-testing-azure-connection'
+  azureLocation: 'eastus'
+  terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)\tf\core\src'
+  settingsDirectory: '$(System.DefaultWorkingDirectory)\settings'
+  testsDirectory: '$(System.DefaultWorkingDirectory)\tests'
+  terraformPlanFile: 'terraform.out'
+  outputDirectory: '$(System.DefaultWorkingDirectory)\output'
+  testresultsDirectory: '$(System.DefaultWorkingDirectory)\testresults'
+  terraformVersion: '0.14.5'
+  pythonVersion: '3.7'
+  goVersion: '1.15.7'
+  terratestLogFile: 'terratest.out'
+  terratestlogparserVersion: '0.32.2'
+  checkovVersion: '1.0.726'
+  checkovSkipChecks: 'CKV_AZURE_33'
+  terraformcomplianceVersion: '1.3.12'
+
+parameters:
+- name: testresultspublish
+  displayName: 'Publish test results after CI?'
+  type: boolean
+  default: true
+
+stages:
+  - stage: CI_Terratest
+    displayName: CI_Terratest
+    variables:
+    - group: env-vars-for-SP-auth
+    jobs:
+    - job: CI_Terratest1
+      displayName: CI_Terratest1
+      pool:
+        vmImage: windows-latest
+      steps:
+      - task: CmdLine@2
+        displayName: 'make directories'
+        inputs:
+          script: |
+            mkdir $(outputDirectory)
+            mkdir $(testresultsDirectory)      
+      - task: UsePythonVersion@0
+        displayName: 'use Python version'
+        inputs:
+          versionSpec: '$(pythonVersion)'
+          addToPath: true
+          architecture: 'x64'
+      - task: TerraformInstaller@0
+        displayName: 'install Terraform'
+        inputs:
+          terraformVersion: $(terraformVersion)
+      - task: GoTool@0
+        displayName: 'install Go'
+        inputs:
+          version: '$(goVersion)'
+      - task: CmdLine@2
+        displayName: 'run Terratest'
+        inputs:
+          script: |
+            go test -v | tee terratest.log
+          workingDirectory: '$(testsDirectory)\terratest'
+      - task: CmdLine@2
+        displayName: 'run Terratest Log Parser'
+        inputs:
+          script: |
+            curl --location --silent --fail --show-error -o terratest_log_parser.exe https://github.com/gruntwork-io/terratest/releases/download/v$(terratestlogparserVersion)/terratest_log_parser_windows_amd64.exe
+            terratest_log_parser.exe -testlog terratest.log -outputdir $(testresultsDirectory)
+          workingDirectory: '$(testsDirectory)\terratest'
+      - task: PublishTestResults@2
+        displayName: 'publish test results'
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '$(testresultsDirectory)\*report.xml'
+        condition: eq(${{ parameters.testresultspublish }}, true)
+  - stage: CI_TerraformAndOSSTools
+    displayName: CI_TerraformAndOSSTools
+    variables:
+    - group: env-vars-for-SP-auth
+    jobs:
+    - job: CI_TerraformAndOSSTools1
+      displayName: CI_TerraformAndOSSTools1
+      pool:
+        vmImage: windows-latest
+      steps:
+      - task: CmdLine@2
+        displayName: 'make directories'
+        inputs:
+          script: |
+            mkdir $(outputDirectory)
+            mkdir $(testresultsDirectory)      
+      - task: UsePythonVersion@0
+        displayName: 'use Python version'
+        inputs:
+          versionSpec: '$(pythonVersion)'
+          addToPath: true
+          architecture: 'x64'
+      - task: TerraformInstaller@0
+        displayName: 'install Terraform'
+        inputs:
+          terraformVersion: $(terraformVersion)
+      - task: CmdLine@2
+        displayName: 'install OSS Tools'
+        inputs:
+          script: |
+            pip install "checkov==$(checkovVersion)"
+            pip install "terraform-compliance==$(terraformcomplianceVersion)"
+      - task: TerraformCLI@0
+        displayName: 'run Terraform init'
+        inputs:
+          command: init
+          workingDirectory: '$(terraformWorkingDirectory)'
+          allowTelemetryCollection: false
+      - task: TerraformCLI@0
+        displayName: 'run Terraform validate'
+        inputs:
+          command: validate
+          workingDirectory: '$(terraformWorkingDirectory)'
+          allowTelemetryCollection: false
+      - task: TerraformCLI@0
+        displayName: 'run Terraform plan'
+        inputs:
+          command: 'plan'
+          workingDirectory: '$(terraformWorkingDirectory)'
+          commandOptions: '-out=$(terraformWorkingDirectory)\$(terraformPlanFile)'
+          allowTelemetryCollection: false
+      - task: CmdLine@2
+        displayName: 'run Checkov'
+        inputs:
+          script: |
+            checkov --soft-fail --directory $(terraformWorkingDirectory) --skip-check $(checkovSkipChecks) --output junitxml > $(testresultsDirectory)\test-checkov-report.xml
+        continueOnError: true
+      - task: CmdLine@2
+        displayName: 'run terraform-compliance'
+        inputs:
+          script: 'terraform-compliance -n -p $(terraformWorkingDirectory)\$(terraformPlanFile) -f $(testsDirectory)\features --junit-xml $(testresultsDirectory)\test-terraformcompliance-report.xml'
+        continueOnError: true
+      - task: PublishTestResults@2
+        displayName: 'publish test results'
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '$(testresultsDirectory)\*report.xml'
+        condition: eq(${{ parameters.testresultspublish }}, true)
