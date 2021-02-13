@@ -19,7 +19,7 @@ variables:
   terratestlogparserVersion: '0.32.2'
   checkovVersion: '1.0.726'
   checkovSkipChecks: 'CKV_AZURE_33'
-  terraformcomplianceVersion: '1.3.12'
+  terraformcomplianceVersion: '1.3.13'
 
 parameters:
 - name: testresultspublish
@@ -137,7 +137,7 @@ stages:
       - task: CmdLine@2
         displayName: 'run terraform-compliance'
         inputs:
-          script: 'terraform-compliance -n -p $(terraformWorkingDirectory)\$(terraformPlanFile) -f $(testsDirectory)\features --junit-xml $(testresultsDirectory)\test-terraformcompliance-report.xml'
+          script: 'terraform-compliance --no-ansi -n -p $(terraformWorkingDirectory)\$(terraformPlanFile) -f $(testsDirectory)\features --junit-xml $(testresultsDirectory)\test-terraformcompliance-report.xml'
         continueOnError: true
       - task: PublishTestResults@2
         displayName: 'publish test results'
