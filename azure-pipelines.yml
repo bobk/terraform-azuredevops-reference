@@ -3,6 +3,9 @@ trigger:
     include:
     - '*'
 
+pool:
+  vmImage: windows-latest
+
 variables:
   serviceConnection: 'terraform-basic-testing-azure-connection'
   azureLocation: 'eastus'
@@ -35,8 +38,6 @@ stages:
     jobs:
     - job: CI_Terratest1
       displayName: CI_Terratest1
-      pool:
-        vmImage: windows-latest
       steps:
       - task: CmdLine@2
         displayName: 'make directories'
@@ -84,8 +85,6 @@ stages:
     jobs:
     - job: CI_TerraformAndOSSTools1
       displayName: CI_TerraformAndOSSTools1
-      pool:
-        vmImage: windows-latest
       steps:
       - task: CmdLine@2
         displayName: 'make directories'
