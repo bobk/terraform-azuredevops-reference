@@ -79,6 +79,7 @@ stages:
           testResultsFiles: '$(testresultsDirectory)\*report.xml'
         condition: eq(${{ parameters.testresultspublish }}, true)
   - stage: CI_TerraformAndOSSTools
+    dependsOn: []
     displayName: CI_TerraformAndOSSTools
     variables:
     - group: env-vars-for-SP-auth
