@@ -16,6 +16,10 @@ parameters:
   displayName: 'Publish test results after CI?'
   type: boolean
   default: true
+- name: terraformcompliancedocker
+  displayName: 'Use Docker container for terraform-compliance?'
+  type: boolean
+  default: false
 
 stages:
   - stage: CI_Terratest
@@ -122,9 +126,10 @@ stages:
             checkov --soft-fail --directory $(terraformWorkingDirectory) --skip-check $(checkovSkipChecks) --output junitxml > $(testresultsDirectory)\test-checkov-report.xml
         continueOnError: true
       - task: CmdLine@2
-        displayName: 'run terraform-compliance'
+        displayName: 'run terraform-compliance via local install'
         inputs:
           script: 'terraform-compliance --no-ansi -n -p $(terraformWorkingDirectory)\$(terraformPlanFile) -f $(testsDirectory)\features --junit-xml $(testresultsDirectory)\test-terraformcompliance-report.xml'
+        condition: eq(${{ parameters.terraformcompliancedocker }}, false)
         continueOnError: true
       - task: PublishTestResults@2
         displayName: 'publish test results'
