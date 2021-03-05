@@ -31,3 +31,6 @@ override.tf.json
 
 .terraform.lock.hcl
 terratest_log_parser.exe
+
+**/.vscode
+**/.vscode/*
