@@ -17,3 +17,4 @@ This reference example should install as a Azure DevOps pipeline and pass all te
 
 Additional expanded documentation will be available shortly.
 
+[![Build Status](https://dev.azure.com/krcloud1/terraform/_apis/build/status/bobk.terraform-azuredevops-reference?branchName=main)](https://dev.azure.com/krcloud1/terraform/_build/latest?definitionId=12&branchName=main)
