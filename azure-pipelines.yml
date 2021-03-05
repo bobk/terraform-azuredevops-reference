@@ -21,7 +21,7 @@ stages:
   - stage: CI_Terratest
     displayName: CI_Terratest
     variables:
-    - group: env-vars-for-SP-auth
+    - group: Azure-auth-vargroup
     jobs:
     - job: CI_Terratest1
       displayName: CI_Terratest1
@@ -69,7 +69,7 @@ stages:
     dependsOn: []
     displayName: CI_TerraformAndOSSTools
     variables:
-    - group: env-vars-for-SP-auth
+    - group: Azure-auth-vargroup
     jobs:
     - job: CI_TerraformAndOSSTools1
       displayName: CI_TerraformAndOSSTools1
