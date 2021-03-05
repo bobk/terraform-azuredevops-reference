@@ -7,22 +7,9 @@ pool:
   vmImage: windows-latest
 
 variables:
-  serviceConnection: 'terraform-basic-testing-azure-connection'
-  azureLocation: 'eastus'
-  terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)\tf\core\src'
-  settingsDirectory: '$(System.DefaultWorkingDirectory)\settings'
-  testsDirectory: '$(System.DefaultWorkingDirectory)\tests'
-  terraformPlanFile: 'terraform.out'
-  outputDirectory: '$(System.DefaultWorkingDirectory)\output'
-  testresultsDirectory: '$(System.DefaultWorkingDirectory)\testresults'
-  terraformVersion: '0.14.5'
-  pythonVersion: '3.7'
-  goVersion: '1.15.7'
-  terratestLogFile: 'terratest.out'
-  terratestlogparserVersion: '0.32.2'
-  checkovVersion: '1.0.726'
-  checkovSkipChecks: 'CKV_AZURE_33'
-  terraformcomplianceVersion: '1.3.13'
+- template: azure-pipelines-armsettings.yml
+- template: azure-pipelines-directories.yml
+- template: azure-pipelines-toolversions.yml
 
 parameters:
 - name: testresultspublish

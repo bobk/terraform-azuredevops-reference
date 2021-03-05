@@ -1,0 +1,6 @@
+variables:
+  terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)\tf\core\src'
+  settingsDirectory: '$(System.DefaultWorkingDirectory)\settings'
+  testsDirectory: '$(System.DefaultWorkingDirectory)\tests'
+  outputDirectory: '$(System.DefaultWorkingDirectory)\output'
+  testresultsDirectory: '$(System.DefaultWorkingDirectory)\testresults'

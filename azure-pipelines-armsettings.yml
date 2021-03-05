@@ -1,0 +1,3 @@
+variables:
+  serviceConnection: 'terraform-basic-testing-azure-connection'
+  azureLocation: 'eastus'

@@ -1,0 +1,10 @@
+variables:
+  terraformVersion: '0.14.5'
+  pythonVersion: '3.7'
+  goVersion: '1.15.7'
+  terratestLogFile: 'terratest.out'
+  terraformPlanFile: 'terraform.out'
+  terratestlogparserVersion: '0.32.2'
+  checkovVersion: '1.0.726'
+  checkovSkipChecks: 'CKV_AZURE_33'
+  terraformcomplianceVersion: '1.3.13'
