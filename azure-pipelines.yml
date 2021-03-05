@@ -17,7 +17,7 @@ parameters:
   type: boolean
   default: true
 - name: terraformcompliancedocker
-  displayName: 'Use Docker container for terraform-compliance?'
+  displayName: 'Run terraform-compliance via Docker container?'
   type: boolean
   default: false
 
@@ -125,11 +125,32 @@ stages:
           script: |
             checkov --soft-fail --directory $(terraformWorkingDirectory) --skip-check $(checkovSkipChecks) --output junitxml > $(testresultsDirectory)\test-checkov-report.xml
         continueOnError: true
+
       - task: CmdLine@2
         displayName: 'run terraform-compliance via local install'
         inputs:
           script: 'terraform-compliance --no-ansi -n -p $(terraformWorkingDirectory)\$(terraformPlanFile) -f $(testsDirectory)\features --junit-xml $(testresultsDirectory)\test-terraformcompliance-report.xml'
         condition: eq(${{ parameters.terraformcompliancedocker }}, false)
+        continueOnError: true
+
+      - task: DockerInstaller@0
+        inputs:
+          dockerVersion: '17.09.0-ce'      
+        condition: eq(${{ parameters.terraformcompliancedocker }}, true)
+        continueOnError: true
+      - task: TerraformCLI@0
+        displayName: 'run Terraform show'
+        inputs:
+          command: 'show'
+          commandOptions: '-json $(terraformWorkingDirectory)\$(terraformPlanFile) > $(terraformWorkingDirectory)\$(terraformPlanFileJSON)'
+          allowTelemetryCollection: false
+        condition: eq(${{ parameters.terraformcompliancedocker }}, true)
+
+      - task: CmdLine@2
+        displayName: 'run terraform-compliance via Docker container'
+        inputs:
+          script: 'docker run --rm -v "$(System.DefaultWorkingDirectory)":/target -i -t $(terraformcomplianceDockerimage):$(terraformcomplianceVersion) --no-ansi -n -f $(testsDirectoryName)\$(featuresDirectoryName) -p $(terraformWorkingDirectoryName)\$(terraformPlanFileJSON) --junit-xml $(testresultsDirectoryName)\test-terraformcompliance-report.xml'
+        condition: eq(${{ parameters.terraformcompliancedocker }}, true)
         continueOnError: true
       - task: PublishTestResults@2
         displayName: 'publish test results'

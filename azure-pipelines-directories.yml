@@ -1,6 +1,10 @@
 variables:
-  terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)\tf\core\src'
+  terraformWorkingDirectoryName: 'tf\core\src'
+  terraformWorkingDirectory: '$(System.DefaultWorkingDirectory)\$(terraformWorkingDirectoryName)'
   settingsDirectory: '$(System.DefaultWorkingDirectory)\settings'
-  testsDirectory: '$(System.DefaultWorkingDirectory)\tests'
+  testsDirectoryName: 'tests'
+  featuresDirectoryName: 'features'
+  testsDirectory: '$(System.DefaultWorkingDirectory)\$(testsDirectoryName)'
   outputDirectory: '$(System.DefaultWorkingDirectory)\output'
-  testresultsDirectory: '$(System.DefaultWorkingDirectory)\testresults'
+  testresultsDirectoryName: 'testresults'
+  testresultsDirectory: '$(System.DefaultWorkingDirectory)\$(testresultsDirectoryName)'

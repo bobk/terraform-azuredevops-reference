@@ -34,3 +34,7 @@ terratest_log_parser.exe
 
 **/.vscode
 **/.vscode/*
+**/testresults
+**/testresults/*
+**/tf/**/*.out
+**/tf/**/*.json

@@ -10,6 +10,7 @@ This is a reference example of a complete Azure DevOps CI cycle for Terraform us
    * configurable static analysis for Terraform HCL
 * terraform-compliance
    * simple BDD testing
+   * via both local command-line and Docker container
 * Azure DevOps 
    * azure-pipelines.yaml, various yaml settings, test results publishing
 
