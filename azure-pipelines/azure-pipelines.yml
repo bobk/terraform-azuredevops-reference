@@ -61,10 +61,10 @@ stages:
           ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
           ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
           ARM_TENANT_ID: $(ARM_TENANT_ID)
-          AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
-          AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
-          AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
-          AZURE_TENANT_ID: $(AZURE_TENANT_ID)
+          AZURE_CLIENT_ID: $(ARM_CLIENT_ID)
+          AZURE_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          AZURE_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          AZURE_TENANT_ID: $(ARM_TENANT_ID)
       - task: CmdLine@2
         displayName: 'run Terratest Log Parser'
         inputs:
@@ -173,7 +173,7 @@ stages:
         displayName: 'run terraform-compliance via local install'
         inputs:
           script: |
-            terraform-compliance --no-ansi -n -p $(terraformWorkingDirectoryLinux)/$(terraformPlanFile) -f $(testsDirectory)/features --junit-xml $(testresultsDirectoryLinux)/test-terraformcompliance-report.xml
+            terraform-compliance --no-ansi -n -p $(terraformWorkingDirectoryLinux)/$(terraformPlanFileJSON) -f $(testsDirectory)/$(featuresDirectoryName) --junit-xml $(testresultsDirectoryLinux)/test-terraformcompliance-report.xml
         condition: eq(${{ parameters.terraformcompliancedocker }}, false)
         continueOnError: true
 
