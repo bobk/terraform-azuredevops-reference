@@ -3,9 +3,6 @@ trigger:
     include:
     - '*'
 
-pool:
-  vmImage: windows-latest
-
 variables:
 - template: azure-pipelines-armsettings.yml
 - template: azure-pipelines-directories.yml
@@ -28,6 +25,8 @@ stages:
     - group: Azure-auth-vargroup
     jobs:
     - job: CI_Terratest1
+      pool:
+        vmImage: windows-latest
       displayName: CI_Terratest1
       steps:
       - task: CmdLine@2
@@ -55,20 +54,21 @@ stages:
         inputs:
           script: |
             go test -v | tee terratest.log
-          workingDirectory: '$(testsDirectory)\terratest'
+          workingDirectory: '$(testsDirectoryTerraTest)'
       - task: CmdLine@2
         displayName: 'run Terratest Log Parser'
         inputs:
           script: |
             curl --location --silent --fail --show-error -o terratest_log_parser.exe https://github.com/gruntwork-io/terratest/releases/download/v$(terratestlogparserVersion)/terratest_log_parser_windows_amd64.exe
             terratest_log_parser.exe -testlog terratest.log -outputdir $(testresultsDirectory)
-          workingDirectory: '$(testsDirectory)\terratest'
+          workingDirectory: '$(testsDirectoryTerraTest)'
       - task: PublishTestResults@2
         displayName: 'publish test results'
         inputs:
           testResultsFormat: 'JUnit'
           testResultsFiles: '$(testresultsDirectory)\*report.xml'
         condition: eq(${{ parameters.testresultspublish }}, true)
+
   - stage: CI_TerraformAndOSSTools
     dependsOn: []
     displayName: CI_TerraformAndOSSTools
@@ -76,6 +76,8 @@ stages:
     - group: Azure-auth-vargroup
     jobs:
     - job: CI_TerraformAndOSSTools1
+      pool:
+        vmImage: ubuntu-latest
       displayName: CI_TerraformAndOSSTools1
       steps:
       - task: CmdLine@2
@@ -104,32 +106,44 @@ stages:
         displayName: 'run Terraform init'
         inputs:
           command: init
-          workingDirectory: '$(terraformWorkingDirectory)'
+          workingDirectory: '$(terraformWorkingDirectoryLinux)'
           allowTelemetryCollection: false
       - task: TerraformCLI@0
         displayName: 'run Terraform validate'
         inputs:
           command: validate
-          workingDirectory: '$(terraformWorkingDirectory)'
+          workingDirectory: '$(terraformWorkingDirectoryLinux)'
           allowTelemetryCollection: false
       - task: TerraformCLI@0
         displayName: 'run Terraform plan'
         inputs:
           command: 'plan'
-          workingDirectory: '$(terraformWorkingDirectory)'
-          commandOptions: '-out=$(terraformWorkingDirectory)\$(terraformPlanFile)'
+          workingDirectory: '$(terraformWorkingDirectoryLinux)'
+          commandOptions: '-out=$(terraformWorkingDirectoryLinux)/$(terraformPlanFile)'
           allowTelemetryCollection: false
+
+      - task: CmdLine@2
+        displayName: 'run Terraform show'
+        inputs: 
+          script: |
+            cd $(terraformWorkingDirectoryLinux)
+            terraform show -json $(terraformWorkingDirectoryLinux)/$(terraformPlanFile) > $(terraformWorkingDirectoryLinux)/$(terraformPlanFileJSON)
+        condition: eq(${{ parameters.terraformcompliancedocker }}, true)
+        continueOnError: true
+  
       - task: CmdLine@2
         displayName: 'run Checkov'
         inputs:
           script: |
-            checkov --soft-fail --directory $(terraformWorkingDirectory) --skip-check $(checkovSkipChecks) --output junitxml > $(testresultsDirectory)\test-checkov-report.xml
+            checkov --soft-fail --directory $(terraformWorkingDirectoryLinux) --skip-check $(checkovSkipChecks) --output junitxml > $(testresultsDirectory)/test-checkov-report.xml
         continueOnError: true
 
       - task: CmdLine@2
         displayName: 'run terraform-compliance via local install'
         inputs:
-          script: 'terraform-compliance --no-ansi -n -p $(terraformWorkingDirectory)\$(terraformPlanFile) -f $(testsDirectory)\features --junit-xml $(testresultsDirectory)\test-terraformcompliance-report.xml'
+          script: |
+            terraform-compliance --no-ansi -n -p $(terraformWorkingDirectoryLinux)/$(terraformPlanFile) -f $(testsDirectory)/features --junit-xml $(testresultsDirectory)/test-terraformcompliance-report.xml
+#           terraform-compliance --no-ansi -n -p /home/vsts/work/1/s/tf/core/src/terraform.out -f /home/vsts/work/1/s\tests/features --junit-xml /home/vsts/work/1/s\testresults/test-terraformcompliance-report.xml
         condition: eq(${{ parameters.terraformcompliancedocker }}, false)
         continueOnError: true
 
@@ -138,23 +152,17 @@ stages:
           dockerVersion: '17.09.0-ce'      
         condition: eq(${{ parameters.terraformcompliancedocker }}, true)
         continueOnError: true
-      - task: TerraformCLI@0
-        displayName: 'run Terraform show'
-        inputs:
-          command: 'show'
-          commandOptions: '-json $(terraformWorkingDirectory)\$(terraformPlanFile) > $(terraformWorkingDirectory)\$(terraformPlanFileJSON)'
-          allowTelemetryCollection: false
-        condition: eq(${{ parameters.terraformcompliancedocker }}, true)
-
       - task: CmdLine@2
         displayName: 'run terraform-compliance via Docker container'
         inputs:
-          script: 'docker run --rm -v "$(System.DefaultWorkingDirectory)":/target -i -t $(terraformcomplianceDockerimage):$(terraformcomplianceVersion) --no-ansi -n -f $(testsDirectoryName)\$(featuresDirectoryName) -p $(terraformWorkingDirectoryName)\$(terraformPlanFileJSON) --junit-xml $(testresultsDirectoryName)\test-terraformcompliance-report.xml'
+          script: |
+            docker run --rm -v "$(System.DefaultWorkingDirectory)":/target $(terraformcomplianceDockerimage):$(terraformcomplianceVersion) --no-ansi -n -f $(testsDirectoryName)/$(featuresDirectoryName) -p $(terraformWorkingDirectoryNameLinux)/$(terraformPlanFileJSON) --junit-xml $(testresultsDirectoryName)/test-terraformcompliance-report.xml
         condition: eq(${{ parameters.terraformcompliancedocker }}, true)
         continueOnError: true
+
       - task: PublishTestResults@2
         displayName: 'publish test results'
         inputs:
           testResultsFormat: 'JUnit'
-          testResultsFiles: '$(testresultsDirectory)\*report.xml'
+          testResultsFiles: '$(testresultsDirectory)/*report.xml'
         condition: eq(${{ parameters.testresultspublish }}, true)
