@@ -27,8 +27,6 @@ stages:
     - job: CI_Terratest1
       pool:
         vmImage: windows-latest
-      variables:
-        ARM_CLIENT_ID: $(ARM_CLIENT_ID)
       displayName: CI_Terratest1
       steps:
       - task: CmdLine@2
@@ -43,6 +41,7 @@ stages:
           versionSpec: '$(pythonVersion)'
           addToPath: true
           architecture: 'x64'
+
       - task: TerraformInstaller@0
         displayName: 'install Terraform'
         inputs:
@@ -59,6 +58,13 @@ stages:
           workingDirectory: '$(testsDirectoryTerraTest)'
         env:
           ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+          AZURE_CLIENT_ID: $(AZURE_CLIENT_ID)
+          AZURE_CLIENT_SECRET: $(AZURE_CLIENT_SECRET)
+          AZURE_SUBSCRIPTION_ID: $(AZURE_SUBSCRIPTION_ID)
+          AZURE_TENANT_ID: $(AZURE_TENANT_ID)
       - task: CmdLine@2
         displayName: 'run Terratest Log Parser'
         inputs:
@@ -66,6 +72,7 @@ stages:
             curl --location --silent --fail --show-error -o terratest_log_parser.exe https://github.com/gruntwork-io/terratest/releases/download/v$(terratestlogparserVersion)/terratest_log_parser_windows_amd64.exe
             terratest_log_parser.exe -testlog terratest.log -outputdir $(testresultsDirectoryWindows)
           workingDirectory: '$(testsDirectoryTerraTest)'
+
       - task: PublishTestResults@2
         displayName: 'publish test results'
         inputs:
@@ -96,28 +103,33 @@ stages:
           versionSpec: '$(pythonVersion)'
           addToPath: true
           architecture: 'x64'
+
       - task: TerraformInstaller@0
         displayName: 'install Terraform'
         inputs:
           terraformVersion: $(terraformVersion)
-      - task: CmdLine@2
-        displayName: 'install OSS Tools'
-        inputs:
-          script: |
-            pip install "checkov==$(checkovVersion)"
-            pip install "terraform-compliance==$(terraformcomplianceVersion)"
       - task: TerraformCLI@0
         displayName: 'run Terraform init'
         inputs:
           command: init
           workingDirectory: '$(terraformWorkingDirectoryLinux)'
           allowTelemetryCollection: false
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
       - task: TerraformCLI@0
         displayName: 'run Terraform validate'
         inputs:
           command: validate
           workingDirectory: '$(terraformWorkingDirectoryLinux)'
           allowTelemetryCollection: false
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
       - task: TerraformCLI@0
         displayName: 'run Terraform plan'
         inputs:
@@ -125,7 +137,11 @@ stages:
           workingDirectory: '$(terraformWorkingDirectoryLinux)'
           commandOptions: '-out=$(terraformWorkingDirectoryLinux)/$(terraformPlanFile)'
           allowTelemetryCollection: false
-
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
       - task: CmdLine@2
         displayName: 'run Terraform show'
         inputs: 
@@ -134,7 +150,18 @@ stages:
             terraform show -json $(terraformWorkingDirectoryLinux)/$(terraformPlanFile) > $(terraformWorkingDirectoryLinux)/$(terraformPlanFileJSON)
         condition: eq(${{ parameters.terraformcompliancedocker }}, true)
         continueOnError: true
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
   
+      - task: CmdLine@2
+        displayName: 'install OSS Tools'
+        inputs:
+          script: |
+            pip install "checkov==$(checkovVersion)"
+            pip install "terraform-compliance==$(terraformcomplianceVersion)"
       - task: CmdLine@2
         displayName: 'run Checkov'
         inputs:
