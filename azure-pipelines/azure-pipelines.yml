@@ -148,7 +148,6 @@ stages:
           script: |
             cd $(terraformWorkingDirectoryLinux)
             terraform show -json $(terraformWorkingDirectoryLinux)/$(terraformPlanFile) > $(terraformWorkingDirectoryLinux)/$(terraformPlanFileJSON)
-        condition: eq(${{ parameters.terraformcompliancedocker }}, true)
         continueOnError: true
         env:
           ARM_CLIENT_ID: $(ARM_CLIENT_ID)
