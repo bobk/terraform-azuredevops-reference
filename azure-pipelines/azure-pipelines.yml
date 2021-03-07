@@ -27,6 +27,8 @@ stages:
     - job: CI_Terratest1
       pool:
         vmImage: windows-latest
+      variables:
+        ARM_CLIENT_ID: $(ARM_CLIENT_ID)
       displayName: CI_Terratest1
       steps:
       - task: CmdLine@2
