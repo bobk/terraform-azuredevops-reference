@@ -55,6 +55,8 @@ stages:
           script: |
             go test -v | tee terratest.log
           workingDirectory: '$(testsDirectoryTerraTest)'
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
       - task: CmdLine@2
         displayName: 'run Terratest Log Parser'
         inputs:
