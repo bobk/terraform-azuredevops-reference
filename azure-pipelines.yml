@@ -34,7 +34,7 @@ stages:
         inputs:
           script: |
             mkdir $(outputDirectory)
-            mkdir $(testresultsDirectory)      
+            mkdir $(testresultsDirectoryWindows)      
       - task: UsePythonVersion@0
         displayName: 'use Python version'
         inputs:
@@ -60,13 +60,13 @@ stages:
         inputs:
           script: |
             curl --location --silent --fail --show-error -o terratest_log_parser.exe https://github.com/gruntwork-io/terratest/releases/download/v$(terratestlogparserVersion)/terratest_log_parser_windows_amd64.exe
-            terratest_log_parser.exe -testlog terratest.log -outputdir $(testresultsDirectory)
+            terratest_log_parser.exe -testlog terratest.log -outputdir $(testresultsDirectoryWindows)
           workingDirectory: '$(testsDirectoryTerraTest)'
       - task: PublishTestResults@2
         displayName: 'publish test results'
         inputs:
           testResultsFormat: 'JUnit'
-          testResultsFiles: '$(testresultsDirectory)\*report.xml'
+          testResultsFiles: '$(testresultsDirectoryWindows)\*report.xml'
         condition: eq(${{ parameters.testresultspublish }}, true)
 
   - stage: CI_TerraformAndOSSTools
@@ -85,7 +85,7 @@ stages:
         inputs:
           script: |
             mkdir $(outputDirectory)
-            mkdir $(testresultsDirectory)      
+            mkdir $(testresultsDirectoryLinux)
       - task: UsePythonVersion@0
         displayName: 'use Python version'
         inputs:
@@ -135,15 +135,14 @@ stages:
         displayName: 'run Checkov'
         inputs:
           script: |
-            checkov --soft-fail --directory $(terraformWorkingDirectoryLinux) --skip-check $(checkovSkipChecks) --output junitxml > $(testresultsDirectory)/test-checkov-report.xml
+            checkov --soft-fail --directory $(terraformWorkingDirectoryLinux) --skip-check $(checkovSkipChecks) --output junitxml > $(testresultsDirectoryLinux)/test-checkov-report.xml
         continueOnError: true
 
       - task: CmdLine@2
         displayName: 'run terraform-compliance via local install'
         inputs:
           script: |
-            terraform-compliance --no-ansi -n -p $(terraformWorkingDirectoryLinux)/$(terraformPlanFile) -f $(testsDirectory)/features --junit-xml $(testresultsDirectory)/test-terraformcompliance-report.xml
-#           terraform-compliance --no-ansi -n -p /home/vsts/work/1/s/tf/core/src/terraform.out -f /home/vsts/work/1/s\tests/features --junit-xml /home/vsts/work/1/s\testresults/test-terraformcompliance-report.xml
+            terraform-compliance --no-ansi -n -p $(terraformWorkingDirectoryLinux)/$(terraformPlanFile) -f $(testsDirectory)/features --junit-xml $(testresultsDirectoryLinux)/test-terraformcompliance-report.xml
         condition: eq(${{ parameters.terraformcompliancedocker }}, false)
         continueOnError: true
 
@@ -164,5 +163,5 @@ stages:
         displayName: 'publish test results'
         inputs:
           testResultsFormat: 'JUnit'
-          testResultsFiles: '$(testresultsDirectory)/*report.xml'
+          testResultsFiles: '$(testresultsDirectoryLinux)/*report.xml'
         condition: eq(${{ parameters.testresultspublish }}, true)

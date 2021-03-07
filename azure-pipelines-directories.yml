@@ -10,4 +10,5 @@ variables:
   featuresDirectoryName: 'features'
   outputDirectory: '$(System.DefaultWorkingDirectory)\output'
   testresultsDirectoryName: 'testresults'
-  testresultsDirectory: '$(System.DefaultWorkingDirectory)\$(testresultsDirectoryName)'
+  testresultsDirectoryWindows: '$(System.DefaultWorkingDirectory)\$(testresultsDirectoryName)'
+  testresultsDirectoryLinux: '$(System.DefaultWorkingDirectory)/$(testresultsDirectoryName)'
