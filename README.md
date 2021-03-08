@@ -26,28 +26,28 @@ https://docs.microsoft.com/en-us/azure/developer/terraform/best-practices-testin
    * via both local install and Docker container
    * https://terraform-compliance.com/
 * Azure DevOps 
-   * azure-pipelines.yaml, various yaml settings, test results publishing
+   * azure-pipelines.yaml and included templates, various YAML settings, secure variables, test results publishing
    * https://azure.microsoft.com/en-us/services/devops
 
 ### Prerequisites
 
 * Create a storage account and container in the desired resource group. Ensure all public access to the storage account and container is off.
 <pre>
-   az storage account create /\
-      --name YOURSTORAGEACCOUNTNAME /\
-      --resource-group YOURRESOURCEGROUPNAME /\
-      --kind StorageV2 /\
-      --sku Standard_LRS /\
-      --https-only true /\
+   az storage account create \
+      --name YOURSTORAGEACCOUNTNAME \
+      --resource-group YOURRESOURCEGROUPNAME \
+      --kind StorageV2 \
+      --sku Standard_LRS \
+      --https-only true \
       --allow-blob-public-access false
 
-   az storage container create /\
-      --name YOURSTORAGECONTAINERNAME /\
-      --account-name YOURSTORAGEACCOUNTNAME /\
-      --public-access off /\
+   az storage container create \
+      --name YOURSTORAGECONTAINERNAME \
+      --account-name YOURSTORAGEACCOUNTNAME \
+      --public-access off \
       --auth-mode login
 </pre>
-* Fork the repo and:
+* Clone the repo and:
 
   * update tf/core/src/main.tf to the appropriate storage account values above. Use any blob key name you want.
   * update tf/core/src/variables.tf to your desired Azure region and ARM resource suffix. Do not change the resource tags (for now).
@@ -56,12 +56,16 @@ https://docs.microsoft.com/en-us/azure/developer/terraform/best-practices-testin
 
 * Create library variables in your Azure DevOps project (be sure to mark them secret):
 <pre>
-  * ARM_CLIENT_ID: yourclientid
-  * ARM_CLIENT_SECRET: yourclientsecret
-  * ARM_SUBSCRIPTION_ID: yoursubscriptionid
-  * ARM_TENANT_ID: yourtenantid
+   ARM_CLIENT_ID: YOURCLIENTID
+   ARM_CLIENT_SECRET: YOURCLIENTSECRET
+   ARM_SUBSCRIPTION_ID: YOURSUBSCRIPTIONID
+   ARM_TENANT_ID: YOURTENANTID
 </pre>
-* Create a new pipeline against the repo. This reference example should install easily as a Azure DevOps pipeline and pass/warn all tests. Note that the pipeline YAML files are in a subdirectory /azure-pipelines.
+
+* For more informationon the above see: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/service_principal_client_secret
+
+
+* Create a new pipeline against the cloned repo. This reference example should install easily as a Azure DevOps pipeline and pass/warn all tests. Note that the pipeline YAML files are in a subdirectory /azure-pipelines.
 
 ### Resources Created
 
@@ -74,7 +78,7 @@ https://docs.microsoft.com/en-us/azure/developer/terraform/best-practices-testin
 | rg-mgmtreference | lawsreference | Log Analytics Workspace |
 
 
-The goal is to eventually build out more resources into Management, Connectivity and Landing Zone management groups/subscriptions (with automated CI of each addition) according to:
+The goal is to eventually build out more example resources into Management, Connectivity and Landing Zone management groups/subscriptions (with automated CI of each addition) according to:
 
 https://docs.microsoft.com/en-us/azure/cloud-adoption-framework/ready/enterprise-scale/architecture
 
