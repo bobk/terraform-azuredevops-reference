@@ -1,11 +1,21 @@
+# trigger on these branches only
 trigger:
   branches:
     include:
-    - '*'
+    - main
+    - dev
+    - feat/*
+    - fix/*
+    
+pr:
+- main
 
 variables:
+# settings specific to ARM locations or objects
 - template: azure-pipelines-armsettings.yml
+# settings that control all the different directories in the build for Linux and Windows
 - template: azure-pipelines-directories.yml
+# settings for the specific versions of the tools that we want to use
 - template: azure-pipelines-toolversions.yml
 
 parameters:
@@ -18,6 +28,7 @@ parameters:
   type: boolean
   default: false
 
+# the first stage runs on windows and does a full Terratest apply and destroy cycle, along with end-to-end testing of deployed resources  
 stages:
   - stage: CI_Terratest
     displayName: CI_Terratest
@@ -50,6 +61,11 @@ stages:
         displayName: 'install Go'
         inputs:
           version: '$(goVersion)'
+
+# we write out a terratest.log and parse it
+# we also need to set the ARM_* variables (from secure library variables), for each step individually,
+# and also set the AZURE_* variables to the same values
+# AZURE_* variables are used by the Azure SDK For Go, which is used by our Terratest Go code
       - task: CmdLine@2
         displayName: 'run Terratest'
         inputs:
@@ -80,6 +96,9 @@ stages:
           testResultsFiles: '$(testresultsDirectoryWindows)\*report.xml'
         condition: eq(${{ parameters.testresultspublish }}, true)
 
+# the second stage runs on Linux since Azure Pipelines on a Windows agent
+# does not have good support for Linux Docker containers
+# here we do static analysis, integration and compliance testing (terraform-compliance)
   - stage: CI_TerraformAndOSSTools
     dependsOn: []
     displayName: CI_TerraformAndOSSTools
@@ -175,10 +194,10 @@ stages:
             terraform-compliance --no-ansi -n -p $(terraformWorkingDirectoryLinux)/$(terraformPlanFileJSON) -f $(testsDirectory)/$(featuresDirectoryName) --junit-xml $(testresultsDirectoryLinux)/test-terraformcompliance-report.xml
         condition: eq(${{ parameters.terraformcompliancedocker }}, false)
         continueOnError: true
-
+# here we download the Docker container corresponding to the selected terraform-compliance version
       - task: DockerInstaller@0
         inputs:
-          dockerVersion: '17.09.0-ce'      
+          dockerVersion: $(dockerVersion)      
         condition: eq(${{ parameters.terraformcompliancedocker }}, true)
         continueOnError: true
       - task: CmdLine@2

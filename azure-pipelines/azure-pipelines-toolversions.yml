@@ -8,6 +8,6 @@ variables:
   terratestlogparserVersion: '0.32.2'
   checkovVersion: '1.0.726'
   checkovSkipChecks: 'CKV_AZURE_33'
+  dockerVersion: '17.09.0-ce'
   terraformcomplianceVersion: '1.3.13'
   terraformcomplianceDockerimage: 'eerkunt/terraform-compliance'
-  
