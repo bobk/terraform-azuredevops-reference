@@ -1,0 +1,271 @@
+# trigger on these branches only
+trigger:
+  branches:
+    include:
+    - main
+    - dev
+    - feat/*
+    - fix/*
+    
+# or on pull requests (optional)
+#pr:
+#  main
+
+variables:
+# settings specific to ARM locations or objects
+- template: azure-pipelines-armsettings.yml
+# settings that control all the different directories in the build for Linux and Windows
+- template: azure-pipelines-directories.yml
+# settings for the specific versions of the tools that we want to use
+- template: azure-pipelines-toolversions.yml
+
+# we set up these parameters in case the user wants to exclude some of the longer tests, when making changes to the CI steps
+parameters:
+- name: testresultspublish
+  displayName: 'Publish test results after CI?'
+  type: boolean
+  default: true
+- name: terratestrun
+  displayName: 'Run Terratest?'
+  type: boolean
+  default: true
+- name: terraformcompliancedockerrun
+  displayName: 'Run terraform-compliance via Docker container?'
+  type: boolean
+  default: false
+
+# the first stage runs on windows and does a full Terratest apply and destroy cycle, along with end-to-end testing of deployed resources  
+# then it does a Terrascan, after downloading, untar-ing and then installing Terrascan
+# it then does a TFSec, after downloading and installing TFSec
+stages:
+  - stage: CI_TerratestAndTerrascanAndTFSec
+    displayName: CI_TerratestAndTerrascan
+    variables:
+    - group: Azure-auth-vargroup
+    jobs:
+    - job: CI_TerratestAndTerrascanAndTFSec1
+      pool:
+        vmImage: windows-latest
+      displayName: CI_TerratestAndTerrascanAndTFSec1
+
+      steps:
+      - task: CmdLine@2
+        displayName: 'make directories'
+        inputs:
+          script: |
+            mkdir $(outputDirectory)
+            mkdir $(testresultsDirectoryWindows)
+
+      - task: TerraformInstaller@0
+        displayName: 'install Terraform'
+        inputs:
+          terraformVersion: $(terraformVersion)
+      - task: GoTool@0
+        displayName: 'install Go'
+        inputs:
+          version: '$(goVersion)'
+        condition: eq(${{ parameters.terratestrun }}, true)
+
+# now we run Terratest - after which we write out a terratest.log and parse it via Terratest Log Parser
+# we also need to set the pipeline's ARM_* variables (from secure library variables), for each step individually,
+# and we also set the AZURE_* variables to the same values
+# AZURE_* variables are used by the Azure SDK For Go, which is used by our Terratest Go code
+      - task: CmdLine@2
+        displayName: 'run Terratest'
+        inputs:
+          script: |
+            go test -v | tee terratest.log
+          workingDirectory: '$(testsDirectoryTerraTest)'
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+          AZURE_CLIENT_ID: $(ARM_CLIENT_ID)
+          AZURE_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          AZURE_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          AZURE_TENANT_ID: $(ARM_TENANT_ID)
+        condition: eq(${{ parameters.terratestrun }}, true)
+
+      - task: CmdLine@2
+        displayName: 'install Terratest Log Parser'
+        inputs:
+          script: |
+            curl --location --silent --fail --show-error -o terratest_log_parser.exe https://github.com/gruntwork-io/terratest/releases/download/v$(terratestlogparserVersion)/terratest_log_parser_windows_amd64.exe
+          workingDirectory: '$(testsDirectoryTerraTest)'
+        condition: eq(${{ parameters.terratestrun }}, true)
+      - task: CmdLine@2
+        displayName: 'run Terratest Log Parser'
+        inputs:
+          script: |
+            terratest_log_parser.exe -testlog terratest.log -outputdir $(testresultsDirectoryWindows)
+          workingDirectory: '$(testsDirectoryTerraTest)'
+        condition: eq(${{ parameters.terratestrun }}, true)
+  
+      - task: CmdLine@2
+        displayName: 'install Terrascan 1'
+        inputs:
+          script: |
+            curl --location --silent --fail --show-error -o $(testsDirectoryTerrascan)\terrascan.tar.gz https://github.com/accurics/terrascan/releases/download/v$(terrascanVersion)/terrascan_$(terrascanVersion)_Windows_x86_64.tar.gz
+          workingDirectory: '$(testsDirectoryTerrascan)'
+      - task: ExtractFiles@1
+        displayName: 'install Terrascan 2'
+        inputs:
+          archiveFilePatterns: '$(testsDirectoryTerrascan)\terrascan.tar.gz'
+          destinationFolder: '$(testsDirectoryTerrascan)'
+          cleanDestinationFolder: false
+          overwriteExistingFiles: true
+      - task: CmdLine@2
+        displayName: 'install Terrascan 3'
+        inputs:
+          script: |
+            terrascan init
+            terrascan version
+          workingDirectory: '$(testsDirectoryTerrascan)'
+      - task: PowerShell@2
+        displayName: 'run Terrascan'
+        inputs:
+          filePath: '$(testsDirectoryTerrascan)\terrascan_run.ps1'
+          arguments: '$(System.DefaultWorkingDirectory)\tf main.tf $(testresultsDirectoryWindows)'
+          errorActionPreference: 'continue'
+          workingDirectory: '$(testsDirectoryTerrascan)'
+
+      - task: CmdLine@2
+        displayName: 'install TFSec'
+        inputs:
+          script: |
+            mkdir $(testsDirectoryTFSec)
+            curl --location --silent --fail --show-error -o $(testsDirectoryTFSec)\tfsec.exe https://github.com/tfsec/tfsec/releases/download/v$(tfsecVersion)/tfsec-windows-amd64.exe
+      - task: CmdLine@2
+        displayName: 'run TFSec'
+        inputs:
+          script: |
+            tfsec.exe $(System.DefaultWorkingDirectory)\tf -f junit --no-color --include-passed --soft-fail --out $(testresultsDirectoryWindows)\test-tfsec-report.xml
+          workingDirectory: '$(testsDirectoryTFSec)'
+    
+      - task: PublishTestResults@2
+        displayName: 'publish test results'
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '$(testresultsDirectoryWindows)\*report.xml'
+        condition: eq(${{ parameters.testresultspublish }}, true)
+
+# the second stage runs on Linux since Azure Pipelines on a Windows agent
+# does not have good support for Linux Docker containers
+# here we do static analysis, integration and compliance testing (terraform-compliance)
+  - stage: CI_TerraformAndOSSTools
+    dependsOn: []
+    displayName: CI_TerraformAndOSSTools
+    variables:
+    - group: Azure-auth-vargroup
+    jobs:
+    - job: CI_TerraformAndOSSTools1
+      pool:
+        vmImage: ubuntu-latest
+      displayName: CI_TerraformAndOSSTools1
+      steps:
+      - task: CmdLine@2
+        displayName: 'make directories'
+        inputs:
+          script: |
+            mkdir $(outputDirectory)
+            mkdir $(testresultsDirectoryLinux)
+      - task: UsePythonVersion@0
+        displayName: 'use Python version'
+        inputs:
+          versionSpec: '$(pythonVersion)'
+          addToPath: true
+          architecture: 'x64'
+
+      - task: TerraformInstaller@0
+        displayName: 'install Terraform'
+        inputs:
+          terraformVersion: $(terraformVersion)
+      - task: TerraformCLI@0
+        displayName: 'run Terraform init'
+        inputs:
+          command: init
+          workingDirectory: '$(terraformWorkingDirectoryLinux)'
+          allowTelemetryCollection: false
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+      - task: TerraformCLI@0
+        displayName: 'run Terraform validate'
+        inputs:
+          command: validate
+          workingDirectory: '$(terraformWorkingDirectoryLinux)'
+          allowTelemetryCollection: false
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+      - task: TerraformCLI@0
+        displayName: 'run Terraform plan'
+        inputs:
+          command: 'plan'
+          workingDirectory: '$(terraformWorkingDirectoryLinux)'
+          commandOptions: '-out=$(terraformWorkingDirectoryLinux)/$(terraformPlanFile)'
+          allowTelemetryCollection: false
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+      - task: CmdLine@2
+        displayName: 'run Terraform show'
+        inputs: 
+          script: |
+            cd $(terraformWorkingDirectoryLinux)
+            terraform show -json $(terraformWorkingDirectoryLinux)/$(terraformPlanFile) > $(terraformWorkingDirectoryLinux)/$(terraformPlanFileJSON)
+        continueOnError: true
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+  
+      - task: CmdLine@2
+        displayName: 'install OSS Tools 1'
+        inputs:
+          script: |
+            pip install "checkov==$(checkovVersion)"
+            pip install "terraform-compliance==$(terraformcomplianceVersion)"
+
+      - task: CmdLine@2
+        displayName: 'run Checkov'
+        inputs:
+          script: |
+            checkov --soft-fail --directory $(terraformWorkingDirectoryLinux) --skip-check $(checkovSkipChecks) --output junitxml > $(testresultsDirectoryLinux)/test-checkov-report.xml
+        continueOnError: true
+
+      - task: CmdLine@2
+        displayName: 'run terraform-compliance via local install'
+        inputs:
+          script: |
+            terraform-compliance --no-ansi -n -p $(terraformWorkingDirectoryLinux)/$(terraformPlanFileJSON) -f $(testsDirectory)/$(terraformcomplianceDirectoryName) --junit-xml $(testresultsDirectoryLinux)/test-terraformcompliance-report.xml
+        condition: eq(${{ parameters.terraformcompliancedockerrun }}, false)
+        continueOnError: true
+# here we download the Docker container corresponding to the selected terraform-compliance version
+      - task: DockerInstaller@0
+        inputs:
+          dockerVersion: $(dockerVersion)      
+        condition: eq(${{ parameters.terraformcompliancedockerrun }}, true)
+        continueOnError: true
+      - task: CmdLine@2
+        displayName: 'run terraform-compliance via Docker container'
+        inputs:
+          script: |
+            docker run --rm -v "$(System.DefaultWorkingDirectory)":/target $(terraformcomplianceDockerimage):$(terraformcomplianceVersion) --no-ansi -n -f $(testsDirectoryName)/$(terraformcomplianceDirectoryName) -p $(terraformWorkingDirectoryNameLinux)/$(terraformPlanFileJSON) --junit-xml $(testresultsDirectoryName)/test-terraformcompliance-report.xml
+        condition: eq(${{ parameters.terraformcompliancedockerrun }}, true)
+        continueOnError: true
+
+      - task: PublishTestResults@2
+        displayName: 'publish test results'
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '$(testresultsDirectoryLinux)/*report.xml'
+        condition: eq(${{ parameters.testresultspublish }}, true)
