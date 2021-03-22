@@ -28,7 +28,7 @@ parameters:
 - name: terratestrun
   displayName: 'Run Terratest?'
   type: boolean
-  default: true
+  default: false
 - name: terraformcompliancedockerrun
   displayName: 'Run terraform-compliance via Docker container?'
   type: boolean
